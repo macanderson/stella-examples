@@ -1,0 +1,31 @@
+# .stella/domains.toml — name the areas of your codebase so lessons and
+# telemetry tag correctly. Hand-tuned beats the heuristic inference when
+# your layout isn't one-directory-per-domain.
+
+version = 1
+inferred_by = "manual"
+
+[[domain]]
+name = "api"
+description = "HTTP layer: routes, handlers, middleware, request/response types"
+paths = ["src/routes", "src/middleware"]
+
+[[domain]]
+name = "data"
+description = "Persistence: models, queries, migrations"
+paths = ["src/models", "src/db", "migrations"]
+
+[[domain]]
+name = "ui"
+description = "Frontend app and shared components"
+paths = ["ui/src"]
+
+[[domain]]
+name = "infra"
+description = "CI, deploy scripts, containers"
+paths = [".github", "deploy", "Dockerfile"]
+
+[[domain]]
+name = "docs"
+description = "User-facing documentation"
+paths = ["docs"]

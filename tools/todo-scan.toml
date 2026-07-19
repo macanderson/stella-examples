@@ -1,0 +1,18 @@
+# .stella/tools/todo-scan.toml
+# A tool the model can call to inventory TODO/FIXME/HACK markers.
+
+name = "todo_scan"
+description = "Scan the workspace (or a subdirectory) for TODO, FIXME, and HACK comments and return them grouped by file. Use before claiming cleanup work is done."
+command = ["./.stella/tools/scripts/todo-scan.sh"]
+timeout_ms = 30000
+
+[input_schema]
+type = "object"
+
+[input_schema.properties.path]
+type = "string"
+description = "Directory to scan, relative to the workspace root. Defaults to the whole workspace."
+
+[input_schema.properties.marker]
+type = "string"
+description = "Restrict to one marker: TODO, FIXME, or HACK."

@@ -1,0 +1,25 @@
+{
+  "tools": { "bash": "on" },
+  "agent_engine_config": {
+    "pipeline_worker_model": "deepseek/deepseek-chat",
+    "pipeline_judge_model": "zai/glm-5.2",
+    "pipeline_triage_model": "deepseek/deepseek-chat",
+    "default_model": "deepseek/deepseek-chat",
+
+    "allowed_models": ["deepseek/deepseek-chat", "zai/glm-5.2"],
+
+    "auto_mode": "off",
+    "effort_auto": "off",
+    "reasoning_auto": "off",
+
+    "agents": {
+      "worker": {
+        "effort": "low",
+        "reasoning": "off",
+        "params": { "max_tokens": 8192 }
+      },
+      "judge": { "effort": "medium", "reasoning": "on" },
+      "triage": { "reasoning": "off" }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "tools": { "bash": "on" },
+  "agent_engine_config": {
+    "pipeline_worker_model": "zai/glm-5.2",
+    "pipeline_judge_model": "anthropic/claude-fable-5",
+    "pipeline_triage_model": "deepseek/deepseek-chat",
+    "default_model": "zai/glm-5.2",
+
+    "allowed_models": [
+      "zai/glm-5.2",
+      "anthropic/claude-fable-5",
+      "openai/gpt-5.5",
+      "deepseek/deepseek-chat"
+    ],
+
+    "auto_mode": "off",
+    "effort_auto": "on",
+    "reasoning_auto": "on"
+  }
+}

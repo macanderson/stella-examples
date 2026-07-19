@@ -1,0 +1,15 @@
+{
+  "providers": {
+    "ollama": {
+      "id": "ollama",
+      "name": "Ollama (local)",
+      "base_url": "http://localhost:11434/v1",
+      "default_model": "qwen2.5-coder:32b",
+      "dialect": "openai-compatible"
+    }
+  },
+  "tools": { "bash": "on" },
+  "agent_engine_config": {
+    "default_model": "ollama/qwen2.5-coder:32b"
+  }
+}

@@ -1,0 +1,33 @@
+# A feature build-out: the API waits on the schema, the UI waits on the
+# API, docs run whenever — isolated in their own worktree.
+#
+#   stella fleet --plan plan.toml --max-concurrency 3 --watch
+
+[[tasks]]
+id = "schema"
+title = "Add the users table"
+prompt = "Add a users table migration (id, email unique, created_at) and the User model with tests."
+claims = ["migrations/", "src/models/user.rs"]
+
+[[tasks]]
+id = "api"
+title = "Expose /users"
+prompt = "Add GET /users and GET /users/:id endpoints backed by the User model, with request tests."
+depends_on = ["schema"]
+isolation = "shared_tree"
+claims = ["src/routes/users.rs", "src/routes/mod.rs"]
+
+[[tasks]]
+id = "ui"
+title = "Users admin page"
+prompt = "Add an admin page listing users from GET /users, with loading and empty states."
+depends_on = ["api"]
+isolation = "shared_tree"
+claims = ["ui/src/pages/users/"]
+
+[[tasks]]
+id = "docs"
+title = "Document the users API"
+prompt = "Document the new /users endpoints in docs/api.md with curl examples matching the implemented routes."
+depends_on = ["api"]
+isolation = "isolated"

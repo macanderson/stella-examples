@@ -1,0 +1,10 @@
+# .stella/tools/loc-report.toml
+# Minimal manifest: no input schema — the tool takes no arguments.
+
+name = "loc_report"
+description = "Report tracked-file line counts by extension for the workspace. Cheap way to gauge the size and language mix of the codebase."
+command = ["./.stella/tools/scripts/loc-report.sh"]
+timeout_ms = 15000
+
+[env]
+LC_ALL = "C"

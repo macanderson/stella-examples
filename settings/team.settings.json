@@ -1,0 +1,40 @@
+{
+  "providers": {
+    "zai": { "name": "Z.ai (team plan)" }
+  },
+  "tools": { "bash": "on" },
+  "agent_engine_config": {
+    "default_model": "zai/glm-5.2",
+    "pipeline_worker_model": "zai/glm-5.2",
+    "pipeline_judge_model": "anthropic/claude-fable-5",
+    "pipeline_triage_model": "deepseek/deepseek-chat",
+    "allowed_models": [
+      "zai/glm-5.2",
+      "anthropic/claude-fable-5",
+      "deepseek/deepseek-chat"
+    ],
+    "effort_auto": "on",
+    "reasoning_auto": "on"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "./scripts/session-context.sh" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./scripts/guard-bash.sh",
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

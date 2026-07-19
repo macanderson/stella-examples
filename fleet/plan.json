@@ -1,0 +1,30 @@
+{
+  "tasks": [
+    {
+      "id": "dead-code",
+      "title": "Remove dead code",
+      "prompt": "Find and remove unused functions, imports, and feature-gated code that no target compiles. Keep the build green.",
+      "claims": ["src/"]
+    },
+    {
+      "id": "clippy",
+      "title": "Clippy clean",
+      "prompt": "Fix every clippy warning with -D warnings across the workspace. No #[allow] without a one-line justification.",
+      "depends_on": ["dead-code"],
+      "isolation": "shared_tree",
+      "claims": ["src/", "Cargo.toml"]
+    },
+    {
+      "id": "docs-sweep",
+      "title": "Doc comment sweep",
+      "prompt": "Add missing doc comments on public items; fix stale ones that contradict the code.",
+      "isolation": "isolated"
+    },
+    {
+      "id": "integrate",
+      "title": "Final gate",
+      "prompt": "Run the full test suite and the format check; fix anything the parallel cleanup broke.",
+      "depends_on": ["clippy", "docs-sweep"]
+    }
+  ]
+}

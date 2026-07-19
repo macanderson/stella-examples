@@ -1,0 +1,17 @@
+# .stella/mcp.toml — one [servers.<name>] table per server.
+
+# stdio: Stella spawns the process. The child gets ONLY the env listed
+# here — no ambient environment leaks through.
+[servers.filesystem]
+transport = "stdio"
+cmd = "mcp-server-filesystem"
+args = ["--root", "/workspace"]
+env = { LOG_LEVEL = "info" }
+
+# http: connect to an already-running server; headers carry auth.
+# Prefer `stella mcp login <name>` for OAuth-capable servers over pasting
+# long-lived tokens here.
+[servers.github]
+transport = "http"
+url = "https://mcp.example.com/mcp"
+headers = { Authorization = "Bearer REPLACE-ME" }
