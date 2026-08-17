@@ -6,9 +6,9 @@ open-source, BYOK, no-phone-home coding agent that runs in your terminal.
 This repo is a working cookbook for **everything configurable in Stella**:
 settings profiles, lifecycle hooks, custom agents, custom commands, custom
 script tools, skills, permission rules, MCP servers, fleet plans, memory
-taxonomies, and headless scripting. Every file matches the schemas Stella
-actually parses, and every directory README says where the file goes on disk
-and what it does once it's there.
+taxonomies, headless scripting, and turn-loop plugins. Every file matches the
+schemas Stella actually parses, and every directory README says where the file
+goes on disk and what it does once it is there.
 
 - **Website / docs:** [stella.oxagen.sh](https://stella.oxagen.sh)
 - **Showcase:** these examples are indexed in the
@@ -31,6 +31,7 @@ and what it does once it's there.
 | [`fleet/`](fleet/) | Fleet plan files — task DAGs fanned out to parallel workers | anywhere; `stella fleet --plan <file>` |
 | [`memory/`](memory/) | Memory & domain taxonomy — `domains.toml`, memories, promotion loop | `.stella/` |
 | [`scripting/`](scripting/) | Headless & CI usage — budgets, JSON output, test-command oracles | your CI / shell |
+| [`plugins/`](plugins/) | Turn-loop plugins — one verification plugin written three times, in Rust, Python and TypeScript | `.stella/plugins/` or `~/.stella/plugins/` |
 
 ## How to use these examples
 
@@ -47,6 +48,14 @@ fields don't load from a cloned repo** until you set `STELLA_TRUST_PROJECT=1`.
 That's Stella refusing to let a repo you just cloned run arbitrary commands
 on your machine. Everything cosmetic (display names, default models, custom
 commands/agents) applies without it.
+
+**Plugins are the one surface with real code in it.**
+[`plugins/`](plugins/) holds the same verification plugin implemented three
+times — Rust, Python and TypeScript — with manifests that are identical except
+for the argv naming each program, and one CI job that runs all three against
+one set of wire vectors. Start with [`plugins/README.md`](plugins/README.md)
+for what a plugin is, the participation grades, and the four points of the
+turn loop.
 
 ```bash
 # try a profile

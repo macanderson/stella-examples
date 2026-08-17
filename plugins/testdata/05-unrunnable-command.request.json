@@ -1,0 +1,25 @@
+{
+  "point": "after_turn",
+  "body": {
+    "protocol_version": 1,
+    "wrapper": "verify-v1",
+    "round": 0,
+    "goal": "make the failing test pass",
+    "candidate": {
+      "handle": "candidate-1",
+      "root": "/tmp",
+      "test": {
+        "program": "stella-no-such-program-exists",
+        "args": [],
+        "baseline": "failed"
+      }
+    },
+    "turn": {
+      "completed": true,
+      "answer": "done",
+      "changed_files": [
+        "src/lib.rs"
+      ]
+    }
+  }
+}

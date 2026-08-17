@@ -1,0 +1,9 @@
+{
+  "point": "after_turn",
+  "body": {
+    "protocol_version": 1,
+    "evidence": {
+      "flip": "unobservable"
+    }
+  }
+}

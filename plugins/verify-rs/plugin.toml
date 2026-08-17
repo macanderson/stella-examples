@@ -1,0 +1,98 @@
+# verify — the same plugin, in three languages (`doc:pipeline-as-plugins` §9).
+#
+# THIS FILE IS BYTE-IDENTICAL ACROSS plugins/verify-rs, verify-py and verify-ts
+# except for the ONE argv line that names this implementation's program. That
+# is Track C's rule 1, and `plugins/ci/check-manifests-identical.py` fails the
+# build if it stops being true. All three are generated from one template by
+# `plugins/ci/generate-manifests.py` — edit that, not this.
+#
+# What it does: once a turn completes, the host sends this plugin an
+# `after_turn` request carrying the candidate grant — the workspace root and
+# the test invocation to run in it. The plugin runs that test and answers with
+# what it OBSERVED: the fail->pass flip and the numbers it measured. It reports
+# no verdict, and it reports no tamper finding — `judge` is the host's function
+# over the rule declared below AS DATA, and the tamper finding is the host's
+# own (#3499). A plugin cannot decide done, in any language.
+#
+# READ THIS BEFORE INSTALLING. Stella does not run this oracle and does not
+# re-check what comes back: the flip and every measurement are what this
+# plugin's own process said it saw. Stella applies the rule below to those
+# reported claims and will not credit a requirement they leave undecided — but
+# it cannot tell an earned result from a typed one. That is what the install
+# prompt says, in those words, and it is the architecture rather than an
+# apology: verification is delivered by the plugin.
+
+name = "verify"
+description = "Runs the test the candidate grant names and reports the fail->pass flip it observed. Stella applies the declared rule; it does not re-run the test."
+
+# Arbiter: this plugin binds the Stop gate, so a turn whose tests did not flip
+# is held open rather than completed. Arbiter is the only grade that may
+# declare [requirements] and [oracle], and it must declare the Stop hook.
+[loop]
+participation = "arbiter"
+hooks = ["Stop"]
+# The wrapper socket points this plugin answers, exhaustively (#3501). `verify`
+# has nothing to contribute before a turn runs, so it declares only the one it
+# implements — and an undeclared point is never dispatched, which is how a host
+# learns that from the manifest instead of from a refusal at run time.
+points = ["after_turn"]
+# The plugin's ASK, not the bound: the host clamps it against its own ceiling.
+max_holds = 2
+
+# The definition of done, enumerated. A hold cites these names.
+[requirements]
+tests-flip = "the test the grant names failed before this turn and passes after it"
+tests-pass = "the test the grant names exits zero"
+
+[oracle]
+# There is deliberately no `command` here. #3501 made `[oracle].command`
+# optional when `[runtime]` is declared, and absent means "the oracle is this
+# plugin's own process" — which it always was. Until then all three of these
+# manifests wrote their `[runtime].argv` out a second time in this block, byte
+# for byte, and that redundant line is the entire reason rule 1's diff used to
+# be four lines instead of two.
+#
+# `tests-flip` is credited only on a fail-before / pass-after transition — the
+# one this plugin REPORTS having seen. Stella does not watch it happen.
+flip = "required"
+# `tamper` is deliberately not declared either. The policy is host-side and has
+# exactly one value, and the finding it produces is not a word a plugin can say
+# — `ObservedEvidence` has no field for it in any language (#3499). Restating
+# the default told a host nothing it did not already know.
+#
+# The names of the numbers this plugin reports. A check may read nothing else.
+# `test-duration-ms` is declared and deliberately unread: reporting a number
+# for the trace is legitimate, and only *deciding* on an undeclared one is
+# refused.
+measurements = ["test-command-exit-code", "test-duration-ms"]
+
+# The verdict rule for `tests-pass`, as data — not as code inside the plugin.
+# A user can read this budget before installing, and a reviewer can diff a
+# change to it.
+[[oracle.checks]]
+requirement = "tests-pass"
+check = "test-command-exit-code <= 0"
+
+# How the host starts this plugin's process for a socket point. A list, never
+# a shell string. ${plugin_dir} interpolation is the host's job. There is
+# deliberately no `language` field: argv already says which interpreter, which
+# is the property that makes this three-language proof a proof.
+[runtime]
+argv = ["${plugin_dir}/bin/verify-rs"]
+timeout_secs = 300
+# The env allowlist is default-deny: the child sees exactly these names and
+# nothing else, and they appear in the install consent text beside the argv.
+# `PATH` is the whole list, and that is #3498's result: the request now carries
+# the candidate root and the test invocation, so there is nothing left for the
+# environment to smuggle in. These manifests used to also declare
+# VERIFY_TEST_COMMAND and VERIFY_BASELINE_EXIT_CODE, because the wire could not
+# say either one.
+env = ["PATH"]
+
+# What the plugin asks to reach outside the turn. A request, never a grant:
+# the consent prompt shows this and a human says yes before any of it is true.
+[[capabilities]]
+tool = "process_spawn"
+risk = "high"
+purpose = "run the test invocation the request's candidate grant names, to observe whether it passes"
+scope = ["the program and args in `candidate.test`, spawned in `candidate.root`"]

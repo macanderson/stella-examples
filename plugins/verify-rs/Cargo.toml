@@ -1,0 +1,23 @@
+[package]
+name = "verify-rs"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.74"
+license = "MIT"
+publish = false
+description = "The `verify` Stella plugin, in Rust: the reference implementation of the wrapper-socket after_turn point."
+
+[lib]
+name = "verify_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "verify-rs"
+path = "src/main.rs"
+
+# A JSON parser and nothing else. `doc:pipeline-as-plugins` §9 rule 3 asks for
+# no SDK in the first cut, and the Rust plugin is held to it too: there is no
+# `stella-*` crate in this file, and there is deliberately nothing to add.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
