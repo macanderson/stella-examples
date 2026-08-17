@@ -1,8 +1,9 @@
 {
   "point": "after_turn",
   "body": {
-    "protocol_version": 2,
+    "protocol_version": 1,
     "wrapper": "verify-v1",
+    "stage": "execute",
     "round": 0,
     "goal": "make the failing test pass",
     "candidate": {

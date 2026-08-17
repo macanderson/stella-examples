@@ -12,9 +12,12 @@
 //! state between calls, which is what makes the same protocol writable in
 //! forty lines of Python.
 //!
-//! This file is the only place the program touches ambient state, and it does
-//! so through the one seam `lib.rs` left for it: `std::env::var` is passed in
-//! as a lookup, so everything above stays pure.
+//! This file touches no ambient state at all any more. It used to pass
+//! `std::env::var` into `handle` as a lookup, because the request carried
+//! neither the candidate root nor the test invocation and the plugin had to
+//! read them out of `[runtime].env` (#3498). The grant carries both now, so the
+//! seam is gone rather than merely unused: there is no environment argument to
+//! pass.
 
 use std::io::{Read, Write};
 
@@ -29,7 +32,7 @@ fn main() -> std::process::ExitCode {
         return std::process::ExitCode::FAILURE;
     }
 
-    let response = match handle(&raw, |name| std::env::var(name).ok(), &ProcessRunner) {
+    let response = match handle(&raw, &ProcessRunner) {
         Ok(response) => response,
         Err(refusal) => {
             eprintln!("verify: {refusal}");

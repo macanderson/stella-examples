@@ -1,13 +1,13 @@
 {
   "point": "after_turn",
   "body": {
-    "protocol_version": 2,
+    "protocol_version": 1,
     "wrapper": "verify-v1",
     "round": 0,
     "goal": "make the failing test pass",
     "candidate": {
       "handle": "candidate-1",
-      "root": "/tmp",
+      "root": "/tmp/stella-no-such-candidate-root",
       "test": {
         "program": "test",
         "args": [

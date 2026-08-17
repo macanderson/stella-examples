@@ -4,7 +4,10 @@
     "protocol_version": 1,
     "evidence": {
       "flip": "unobservable",
-      "tamper": "not-checked"
+      "measurements": {
+        "test-command-exit-code": 0,
+        "test-duration-ms": 0
+      }
     }
   }
 }

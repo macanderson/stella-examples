@@ -5,7 +5,19 @@
     "wrapper": "verify-v1",
     "round": 0,
     "goal": "make the failing test pass",
-    "candidate": "candidate-1",
+    "candidate": {
+      "handle": "candidate-1",
+      "root": "/tmp",
+      "test": {
+        "program": "test",
+        "args": [
+          "1",
+          "=",
+          "2"
+        ],
+        "baseline": "failed"
+      }
+    },
     "turn": {
       "completed": true,
       "answer": "done",

@@ -11,7 +11,6 @@
 //! Nothing here imports `verify_rs`. That is deliberate: this test knows only
 //! what a host knows.
 
-use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -19,9 +18,10 @@ use std::process::{Command, Stdio};
 /// The one value that is wall clock and cannot be golden.
 const WALL_CLOCK_MEASUREMENT: &str = "test-duration-ms";
 
-/// The `PATH` the vectors run with. Default-deny like `[runtime].env`: the
-/// child sees this and whatever the vector's `.env.json` adds, and nothing of
-/// the ambient environment.
+/// The whole environment the vectors run with. Default-deny like
+/// `[runtime].env`, whose entire allowlist is now `PATH`: the child sees this
+/// and nothing of the ambient environment, because everything it acts on
+/// arrives in the request (#3498).
 const VECTOR_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
 fn testdata_dir() -> PathBuf {
@@ -37,13 +37,10 @@ struct Answer {
     stderr: String,
 }
 
-/// Feed one request to the compiled binary under one exact environment.
-fn ask(request: &[u8], env: &BTreeMap<String, String>) -> Answer {
+/// Feed one request to the compiled binary with `PATH` and nothing else.
+fn ask(request: &[u8]) -> Answer {
     let mut command = Command::new(env!("CARGO_BIN_EXE_verify-rs"));
     command.env_clear().env("PATH", VECTOR_PATH);
-    for (name, value) in env {
-        command.env(name, value);
-    }
     let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -103,7 +100,7 @@ fn the_compiled_binary_answers_every_shared_vector_exactly() {
     vectors.sort();
 
     assert!(
-        vectors.len() >= 8,
+        vectors.len() >= 17,
         "expected the shared vectors at {}, found {}",
         dir.display(),
         vectors.len()
@@ -117,15 +114,8 @@ fn the_compiled_binary_answers_every_shared_vector_exactly() {
             .to_string();
         let sibling = |suffix: &str| dir.join(name.replace(".request.json", suffix));
 
-        let env_path = sibling(".env.json");
-        let env: BTreeMap<String, String> = if env_path.exists() {
-            serde_json::from_value(read_json(&env_path)).expect("the env map is strings")
-        } else {
-            BTreeMap::new()
-        };
-
         let request = std::fs::read(&vector).expect("the vector is readable");
-        let answer = ask(&request, &env);
+        let answer = ask(&request);
 
         let refusal_path = sibling(".refusal.txt");
         if refusal_path.exists() {
@@ -158,7 +148,7 @@ fn the_compiled_binary_answers_every_shared_vector_exactly() {
 
 #[test]
 fn a_plugin_that_is_asked_nothing_refuses_rather_than_answering() {
-    let answer = ask(b"", &BTreeMap::new());
+    let answer = ask(b"");
     assert!(!answer.success);
     assert_eq!(
         answer.stderr.trim(),
@@ -166,16 +156,38 @@ fn a_plugin_that_is_asked_nothing_refuses_rather_than_answering() {
     );
 }
 
+/// **The witness for #3498**, and the reason this file no longer has an
+/// environment parameter: the plugin observes a flip with `PATH` as its whole
+/// environment, because the candidate root and the test invocation arrived in
+/// the request. The same request used to answer `unobservable` here unless the
+/// harness also set `VERIFY_TEST_COMMAND` and `VERIFY_BASELINE_EXIT_CODE`.
+///
+/// The falsifier is the second half: strip the grant's `test` out of the very
+/// same request and the flip collapses to `unobservable`, which is what proves
+/// the answer above came from the request rather than from anything ambient.
 #[test]
-fn the_plugin_sees_only_the_environment_it_was_given() {
-    // `[runtime].env` is default-deny, and the vectors run that way. A plugin
-    // that quietly read an inherited variable would pass its own tests and
-    // fail on a host that withheld it, so the harness withholds everything.
-    let mut env = BTreeMap::new();
-    env.insert("VERIFY_TEST_COMMAND".to_string(), r#"["true"]"#.to_string());
-    env.insert("VERIFY_BASELINE_EXIT_CODE".to_string(), "1".to_string());
-    let request = std::fs::read(testdata_dir().join("01-flip.request.json")).expect("readable");
-    let answer = ask(&request, &env);
+fn the_plugin_needs_no_environment_beyond_path() {
+    let path = testdata_dir().join("01-flip.request.json");
+    let request = std::fs::read(&path).expect("readable");
+    let answer = ask(&request);
     assert!(answer.success, "{}", answer.stderr);
-    assert!(answer.stdout.contains(r#""flip":"achieved""#));
+    assert!(
+        answer.stdout.contains(r#""flip":"achieved""#),
+        "the grant carried the test and the baseline: {}",
+        answer.stdout
+    );
+
+    let mut stripped = read_json(&path);
+    stripped
+        .pointer_mut("/body/candidate")
+        .and_then(serde_json::Value::as_object_mut)
+        .expect("the vector carries a grant")
+        .remove("test");
+    let answer = ask(stripped.to_string().as_bytes());
+    assert!(answer.success, "{}", answer.stderr);
+    assert!(
+        answer.stdout.contains(r#""flip":"unobservable""#),
+        "with no test in the grant there is nothing to observe: {}",
+        answer.stdout
+    );
 }

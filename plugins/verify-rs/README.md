@@ -10,11 +10,21 @@ second-class and will rot."*
 
 ## What it does
 
-Once a turn completes, Stella sends this plugin an `after_turn` request. The
-plugin runs a test command and answers with an evidence set: what it saw of the
-fail→pass flip, what its tamper check found, and the numbers it measured. It
-reports **no verdict** — Stella decides done from the rule
-[`plugin.toml`](plugin.toml) declares as data.
+Once a turn completes, Stella sends this plugin an `after_turn` request
+carrying the **candidate grant**: the workspace root, and the test invocation to
+run in it as a program, an argument vector, and what that same invocation
+reported before the turn. The plugin runs that test and answers with what it
+observed — the fail→pass flip and the numbers it measured. It reports **no
+verdict**, and it cannot report a tamper finding: that one is the host's own
+(#3499).
+
+**Stella does not run this oracle and does not re-check what comes back.** The
+flip and every measurement are what this plugin's process said it saw; Stella
+applies the rule [`plugin.toml`](plugin.toml) declares to those reported claims
+and will not credit a requirement they leave undecided, but it cannot tell an
+earned result from a typed one. That is what the install prompt says, and it is
+the architecture rather than an apology: verification is delivered by the
+plugin.
 
 ## It does not depend on `stella-plugin`
 
@@ -33,7 +43,7 @@ allows in as many words.
 | File | What it is |
 | --- | --- |
 | [`src/lib.rs`](src/lib.rs) | the wire shapes, plus `observe()` — the in-process path, synchronous, with the test runner injected through a `TestRunner` seam so it spawns nothing in a unit test |
-| [`src/main.rs`](src/main.rs) | the wire entrypoint: stdin → response on stdout, or a refusal on stderr with a non-zero exit. The only place the program touches ambient state, and it passes `std::env::var` in as a lookup so everything above stays pure |
+| [`src/main.rs`](src/main.rs) | the wire entrypoint: stdin → response on stdout, or a refusal on stderr with a non-zero exit. It touches no ambient state at all — it used to pass `std::env::var` in as a lookup, and #3498 removed the seam rather than leaving it unused |
 | [`tests/wire.rs`](tests/wire.rs) | spawns the **compiled binary** against the shared goldens. Imports nothing from the library: this test knows only what a host knows |
 
 ## Build and install
@@ -42,9 +52,14 @@ allows in as many words.
 cargo build --release
 mkdir -p bin && cp target/release/verify-rs bin/verify-rs
 
-mkdir -p .stella/plugins/verify
-cp -r plugin.toml bin .stella/plugins/verify/
+stella plugin install .              # this workspace
+stella plugin install . --scope user # every workspace
 ```
+
+`install` prints the whole declaration — including the disclosure that this
+plugin reports its own evidence — and installs nothing until you accept it.
+Build before you install: `[runtime].argv` names `bin/verify-rs`, and the host
+never invokes a compiler.
 
 `[runtime].argv` is `["${plugin_dir}/bin/verify-rs"]` — a single compiled
 binary, which is the cheapest thing the host can spawn (about 1.2 ms against
@@ -54,16 +69,21 @@ binary, which is the cheapest thing the host can spawn (about 1.2 ms against
 
 ```bash
 echo '{"point":"after_turn","body":{"protocol_version":1,"wrapper":"verify-v1",
-  "round":0,"goal":"go","candidate":"candidate-1","turn":{"completed":true}}}' \
-| VERIFY_TEST_COMMAND='["cargo","test","--quiet"]' VERIFY_BASELINE_EXIT_CODE=1 \
-  ./bin/verify-rs
+  "round":0,"goal":"go","candidate":{"handle":"candidate-1","root":"/tmp",
+  "test":{"program":"cargo","args":["test","--quiet"],"baseline":"failed"}},
+  "turn":{"completed":true}}}' \
+| ./bin/verify-rs
 ```
 
-With `VERIFY_TEST_COMMAND` or `VERIFY_BASELINE_EXIT_CODE` unset it answers
-`{"flip":"unobservable","tamper":"not-checked"}` — the honest evidence for "I
-could not observe anything", rather than a guess. Both names are declared in
-`[runtime].env`, which is default-deny; see [`../README.md`](../README.md)
-§ "What the wire could not say" for why they exist at all.
+Nothing else is set: no environment variable, no working directory, no flags.
+The grant carries the root and the invocation, which is the whole of #3498. With
+no `test` in the grant — or no `candidate` at all — it answers
+`{"flip":"unobservable"}`, the honest evidence for "I could not observe
+anything", rather than a guess.
+
+A `baseline` of `not-run` or `unobserved` gets the same `unobservable` flip: a
+run that never watched an assertion is not red, so a green run after it is not a
+flip — and it is not the worker's fault either (#860).
 
 ## Test
 

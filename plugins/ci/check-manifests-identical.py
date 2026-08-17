@@ -18,9 +18,13 @@ This script checks the rule two ways, because they fail differently:
    write the same argv twice.
 
 It also asserts the one thing that keeps the exemption honest: within a single
-manifest, `[oracle].command.argv` and `[runtime].argv` must name the *same*
-program. Two process declarations for one process is a finding, not a licence
-to declare two different programs.
+manifest the program is declared **once**. It used to be twice — `Oracle` had a
+required `command` field, so a plugin whose evidence comes from the `after_turn`
+socket point still had to name an oracle argv, and every one of these three
+manifests wrote its `[runtime].argv` out a second time byte for byte. #3501 made
+`[oracle].command` optional when `[runtime]` is present, so this script now
+refuses a manifest that reintroduces the second declaration rather than merely
+requiring the two copies to agree.
 """
 
 from __future__ import annotations
@@ -34,9 +38,9 @@ from pathlib import Path
 PLUGINS = Path(__file__).resolve().parent.parent
 IMPLEMENTATIONS = ["verify-rs", "verify-py", "verify-ts"]
 
-# The one field the rule exempts, plus the redundant second copy of it that the
-# grammar forces (see plugins/README.md § "What the grammar could not say").
-EXEMPT = [("runtime", "argv"), ("oracle", "command", "argv")]
+# The one field the rule exempts, and since #3501 the only one: the argv is
+# declared once, in `[runtime]`.
+EXEMPT = [("runtime", "argv")]
 
 
 def strip_exempt(manifest: dict) -> dict:
@@ -77,19 +81,20 @@ def main() -> int:
             print(f"FAIL {failure}")
         return 1
 
-    # 1. Within each manifest, the two argv declarations name one program.
+    # 1. Within each manifest, the program is named once and only once.
     for name, manifest in parsed.items():
         runtime_argv = dig(manifest, ("runtime", "argv"))
         oracle_argv = dig(manifest, ("oracle", "command", "argv"))
         if runtime_argv is None:
             failures.append(f"{name}: no [runtime].argv")
-        elif runtime_argv != oracle_argv:
+        elif oracle_argv is not None:
             failures.append(
-                f"{name}: [runtime].argv {runtime_argv!r} != "
-                f"[oracle].command.argv {oracle_argv!r} — one plugin, one program"
+                f"{name}: [oracle].command.argv {oracle_argv!r} declares the program a "
+                "second time. Since #3501 an absent [oracle].command means the oracle "
+                "is the plugin's own [runtime] process, which is what this plugin's is"
             )
         else:
-            print(f"  ok   {name}: one program, declared twice: {runtime_argv}")
+            print(f"  ok   {name}: one program, declared once: {runtime_argv}")
 
     # 2. Structural equality of everything the rule does not exempt.
     reference = IMPLEMENTATIONS[0]
@@ -114,7 +119,7 @@ def main() -> int:
             )
             if line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
         ]
-        # Each exempt argv shows up as one removed and one added line.
+        # The one exempt argv shows up as one removed and one added line.
         expected = 2 * len(EXEMPT)
         verdict = "ok  " if len(changed) == expected else "FAIL"
         print(f"  {verdict} {reference} vs {name}: {len(changed)} differing lines")
@@ -123,7 +128,7 @@ def main() -> int:
         if len(changed) != expected:
             failures.append(
                 f"{name}: {len(changed)} lines differ from {reference}, expected "
-                f"exactly {expected} (the argv, written {len(EXEMPT)} times)"
+                f"exactly {expected} (the one argv line, removed and added)"
             )
 
     if failures:

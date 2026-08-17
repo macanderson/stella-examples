@@ -11,12 +11,11 @@ harness, one set of vectors, three languages.
     ./plugins/ci/conformance.py -- node plugins/verify-ts/dist/main.js
     ./plugins/ci/conformance.py -- plugins/verify-rs/bin/verify-rs
 
-Each vector `NN-name` is up to four files:
+Each vector `NN-name` is exactly two files:
 
 | file | meaning |
 |---|---|
 | `NN-name.request.json` | written to the plugin's stdin |
-| `NN-name.env.json`     | the exact environment the plugin is given (default-deny, like `[runtime].env`) |
 | `NN-name.expected.json` | the plugin must exit 0 and print this on stdout |
 | `NN-name.refusal.txt`   | the plugin must exit non-zero and print this on stderr |
 
@@ -25,6 +24,15 @@ case is not an afterthought: `AfterTurnResponse` has no error variant on
 purpose, so a plugin that cannot answer *fails*, and the host substitutes
 `EvidenceSet::unobserved()`. Grading the failure path is how we check all three
 fail the same way.
+
+**Every plugin runs with `PATH` and nothing else**, which is the #3498 result
+stated as a harness rule. There used to be a third file per vector — an
+`env.json` naming `VERIFY_TEST_COMMAND` and `VERIFY_BASELINE_EXIT_CODE` —
+because the request carried no candidate root and no test invocation, so the
+only way to hand a plugin its test was out of band. The request carries both
+now (`CandidateGrant`), so a vector that needed an environment would be a bug in
+the plugin rather than a fixture: it would mean the plugin reached for something
+the host did not send.
 
 One value is normalized before comparison: `test-duration-ms`, which is wall
 clock and cannot be golden. It is asserted to be a non-negative integer and
@@ -77,14 +85,13 @@ def sibling(request_path: Path, suffix: str) -> Path:
 
 
 def run_vector(argv: list[str], request_path: Path) -> tuple[bool, str]:
-    env_path = sibling(request_path, ".env.json")
-    # Default-deny, exactly like `[runtime].env`: the child sees what the
-    # vector names and nothing else. `PATH` is added because the plugin has to
-    # be able to find the interpreter and the test command, and it is the one
-    # name every one of these manifests allowlists.
+    # Default-deny, exactly like `[runtime].env` — and the whole allowlist is
+    # `PATH`, because that is all these manifests declare. The plugin needs it
+    # to find its interpreter and the test program; everything else it acts on
+    # arrives in the request. A plugin that quietly read an inherited variable
+    # would pass here and fail on a host that withheld it, so nothing is
+    # inherited.
     env = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
-    if env_path.exists():
-        env.update(json.loads(env_path.read_text()))
 
     proc = subprocess.run(
         argv,
