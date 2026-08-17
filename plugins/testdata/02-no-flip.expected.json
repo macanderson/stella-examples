@@ -1,0 +1,14 @@
+{
+  "point": "after_turn",
+  "body": {
+    "protocol_version": 1,
+    "evidence": {
+      "flip": "not-achieved",
+      "tamper": "not-checked",
+      "measurements": {
+        "test-command-exit-code": 1,
+        "test-duration-ms": 0
+      }
+    }
+  }
+}

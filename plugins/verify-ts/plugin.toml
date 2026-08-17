@@ -1,0 +1,88 @@
+# verify — the same plugin, in three languages (`doc:pipeline-as-plugins` §9).
+#
+# THIS FILE IS BYTE-IDENTICAL ACROSS plugins/verify-rs, verify-py and verify-ts
+# except for the two argv lines that name this implementation's program. That
+# is Track C's rule 1, and `plugins/ci/check-manifests-identical.py` fails the
+# build if it stops being true. All three are generated from one template by
+# `plugins/ci/generate-manifests.py` — edit that, not this.
+#
+# What it does: once a turn completes, the host sends this plugin an
+# `after_turn` request. The plugin runs a test command and answers with an
+# `EvidenceSet` — what it saw of the fail->pass flip, what its tamper check
+# found, and the numbers it measured. It reports NO verdict. The host's `judge`
+# turns that evidence into one, using the rule declared below AS DATA:
+# `flip = "required"` decides `tests-flip`, and the `[[oracle.checks]]` entry
+# decides `tests-pass`. A plugin cannot decide done, in any language
+# (`doc:wrapper-socket` §4).
+
+name = "verify"
+description = "Runs a test command after a turn and reports the fail->pass flip as evidence. The host decides done."
+
+# Arbiter: this plugin binds the Stop gate, so a turn whose tests did not flip
+# is held open rather than completed. Arbiter is the only grade that may
+# declare [requirements] and [oracle], and it must declare the Stop hook.
+[loop]
+participation = "arbiter"
+hooks = ["Stop"]
+# The plugin's ASK, not the bound: the host clamps it against its own ceiling.
+max_holds = 2
+
+# The definition of done, enumerated. A hold cites these names.
+[requirements]
+tests-flip = "the test command failed before this turn and passes after it"
+tests-pass = "the test command exits zero"
+
+[oracle]
+# Identical to [runtime].argv below. See plugins/README.md § "What the grammar
+# could not say": `Oracle.command` is not optional, so a plugin whose evidence
+# comes from the `after_turn` socket point must still declare a second,
+# redundant process here. Both lines name the same program on purpose.
+command = { argv = ["node", "${plugin_dir}/dist/main.js"], timeout_secs = 300 }
+# The host credits `tests-flip` only on an observed fail-before / pass-after
+# transition. The plugin reports what it saw of that transition; it does not
+# get to assert it.
+flip = "required"
+# The "before" half is worthless if the worker can rewrite it, so the host
+# snapshots artifact identity at authoring time and refuses the flip if it
+# changed by verify time. NOTE: the snapshotting is host-side, and an
+# out-of-process plugin has no way to report anything but `not-checked` — see
+# plugins/README.md § "What the wire could not say".
+tamper = "artifact-identity"
+# The names of the numbers this plugin reports. A check may read nothing else.
+# `test-duration-ms` is declared and deliberately unread: reporting a number
+# for the trace is legitimate, and only *deciding* on an undeclared one is
+# refused.
+measurements = ["test-command-exit-code", "test-duration-ms"]
+
+# The verdict rule for `tests-pass`, as data — not as code inside the plugin.
+# A user can read this budget before installing, and a reviewer can diff a
+# change to it.
+[[oracle.checks]]
+requirement = "tests-pass"
+check = "test-command-exit-code <= 0"
+
+# How the host starts this plugin's process for a socket point. A list, never
+# a shell string. ${plugin_dir} interpolation is the host's job. There is
+# deliberately no `language` field: argv already says which interpreter, which
+# is the property that makes this three-language proof a proof.
+[runtime]
+argv = ["node", "${plugin_dir}/dist/main.js"]
+timeout_secs = 300
+# The env allowlist is default-deny: the child sees exactly these names and
+# nothing else, and they appear in the install consent text beside the argv.
+#
+# The last two are a DISCOVERED GAP, not a design — plugins/README.md
+# § "What the wire could not say". `AfterTurnRequest` hands a plugin a
+# `CandidateHandle` but no channel to invoke `CandidateOp::RunTest` with it and
+# no root path, so today the only way an out-of-process plugin can learn which
+# test to run is out of band. With either unset the plugin answers
+# `EvidenceSet::unobserved()` rather than guessing.
+env = ["PATH", "VERIFY_TEST_COMMAND", "VERIFY_BASELINE_EXIT_CODE"]
+
+# What the plugin asks to reach outside the turn. A request, never a grant:
+# the consent prompt shows this and a human says yes before any of it is true.
+[[capabilities]]
+tool = "process_spawn"
+risk = "high"
+purpose = "run the test command named in VERIFY_TEST_COMMAND, to observe whether it passes"
+scope = ["the argv in `VERIFY_TEST_COMMAND`, spawned in the process working directory"]

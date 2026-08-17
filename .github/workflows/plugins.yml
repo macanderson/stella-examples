@@ -1,0 +1,125 @@
+# Track C rule 4: CI runs all three plugins on every PR.
+#
+# The point is not that each language works in isolation — it is that the
+# *same* vectors and the *same* goldens grade all three. A protocol change that
+# breaks a non-Rust plugin fails the PR that made it, rather than being
+# discovered by a user (`doc:pipeline-as-plugins` §9).
+#
+# Each language is its own job so a failure names the language that broke,
+# and the shared-invariant checks are a fourth job that needs no toolchain at
+# all.
+
+name: plugins
+
+on:
+  pull_request:
+    paths:
+      - "plugins/**"
+      - ".github/workflows/plugins.yml"
+  push:
+    branches: [main]
+    paths:
+      - "plugins/**"
+      - ".github/workflows/plugins.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugins-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The rules that are about the three plugins *together*, and so belong to
+  # none of them. No compiler, no interpreter beyond the Python that is
+  # already on the runner.
+  shared:
+    name: manifests + vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rule 1 — the manifests are generated from one template
+        run: python3 plugins/ci/generate-manifests.py --check
+      - name: Rule 1 — the manifests differ only in the argv naming the program
+        run: python3 plugins/ci/check-manifests-identical.py
+      - name: Every vector has exactly one golden
+        run: |
+          set -euo pipefail
+          fail=0
+          for request in plugins/testdata/*.request.json; do
+            base="${request%.request.json}"
+            expected=0
+            [ -f "$base.expected.json" ] && expected=$((expected + 1))
+            [ -f "$base.refusal.txt" ] && expected=$((expected + 1))
+            if [ "$expected" -ne 1 ]; then
+              echo "FAIL $request has $expected goldens, expected exactly 1"
+              fail=1
+            fi
+          done
+          exit "$fail"
+
+  python:
+    name: verify-py
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # No `pip install`. If this step ever needs one, rule 3 has been broken.
+      - name: Shared conformance vectors
+        run: python3 plugins/ci/conformance.py -- python3 plugins/verify-py/main.py
+      - name: The plugin's own tests
+        run: python3 plugins/verify-py/test_wire.py
+
+  typescript:
+    name: verify-ts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/verify-ts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # The build step, run rather than described. `dependencies` is empty, so
+      # this fetches the TypeScript compiler and nothing else.
+      - run: npm install
+      - run: npm run build
+      - name: Shared conformance vectors
+        working-directory: .
+        run: python3 plugins/ci/conformance.py -- node plugins/verify-ts/dist/main.js
+      - name: The plugin's own tests
+        run: node --test test/wire.test.js
+
+  rust:
+    name: verify-rs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: plugins/verify-rs
+      - name: Format
+        working-directory: plugins/verify-rs
+        run: cargo fmt --check
+      - name: Lint
+        working-directory: plugins/verify-rs
+        run: cargo clippy --all-targets -- -D warnings
+      # Rule 2: the wire path is what CI grades. `cargo test` runs
+      # tests/wire.rs, which spawns the compiled binary.
+      - name: Test
+        working-directory: plugins/verify-rs
+        run: cargo test
+      - name: Build the artifact [runtime].argv names
+        working-directory: plugins/verify-rs
+        run: |
+          cargo build --release
+          mkdir -p bin
+          cp target/release/verify-rs bin/verify-rs
+      - name: Shared conformance vectors
+        run: python3 plugins/ci/conformance.py -- plugins/verify-rs/bin/verify-rs

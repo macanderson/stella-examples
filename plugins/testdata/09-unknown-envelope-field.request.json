@@ -1,0 +1,18 @@
+{
+  "point": "after_turn",
+  "body": {
+    "protocol_version": 1,
+    "wrapper": "verify-v1",
+    "round": 0,
+    "goal": "make the failing test pass",
+    "candidate": "candidate-1",
+    "turn": {
+      "completed": true,
+      "answer": "done",
+      "changed_files": [
+        "src/lib.rs"
+      ]
+    }
+  },
+  "extra": 1
+}
