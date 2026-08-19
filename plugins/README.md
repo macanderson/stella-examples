@@ -313,8 +313,15 @@ nothing until you accept it. Project scope is `<workspace>/.stella/plugins/`,
 user scope is `~/.stella/plugins/`, and `${plugin_dir}` in the manifest's argv
 resolves to whichever it landed in.
 
-What does **not** exist yet is the other half: nothing in a live `stella run`
-sends an installed plugin an `after_turn` request. The socket is implemented in
-`stella-runtime` and exercised by its own tests, but `grep -rn after_turn
-crates/stella-cli/src` finds only the install command's own module, so these
-three plugins are still graded by the shared harness rather than by a real turn.
+The other half exists now too. `stella run --pipeline verify` — naming this
+manifest's own `name` — hands the turn to the wrapper socket, and a real
+turn's `after_turn` request reaches the installed plugin's process:
+`grep -rn after_turn crates/stella-cli/src` now finds the live dispatcher
+(`wrapper_plugin.rs`), not just the install command's own module. `stella
+goal` drives the same socket per round, but only at `steering`/`observer`
+grade — arbiter participation, the grade `verify` asks for, is refused
+pre-flight there (#3832), because a goal run is already one loop with its
+own arbiter and does not nest a second one inside it. So these three plugins
+are graded two ways today: the shared conformance harness above, against the
+wire contract in isolation, and `stella run --pipeline verify`, against a
+real turn.
